@@ -1,0 +1,313 @@
+local Players = game:GetService('Players')
+local ReplicatedStorage = game:GetService('ReplicatedStorage')
+local UserInputService = game:GetService('UserInputService')
+local RunService = game:GetService('RunService')
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local folderData = ReplicatedStorage.Datas[player.UserId]
+local millon = 1000000
+
+local arregloAtaques = {
+    {name = "God Slicer", requerido = millon * 60},
+    {name = "Spirit Barrage", requerido = millon * 60},
+    {name = "Super Dragon Fist", requerido = millon * 50},
+    {name = "Flash Kick", requerido = millon / 2},
+    {name = "Spirit Breaking Cannon", requerido = 200000},
+    {name = "Mach Kick", requerido = 90000},
+    {name = "High Power Rush", requerido = 65000},
+    {name = "Meteor Crash", requerido = 28000},
+    {name = "Wolf Fang Fist", requerido = 2000},
+    {name = "Bone Crusher", requerido = 0},
+    {name = "Vanish Strike", requerido = 0},
+    {name = "Uppercut", requerido = 0},
+    {name = "Sledgehammer", requerido = 0},
+    {name = "Vital Strike", requerido = 0},
+}
+
+local ataquesEnergy = {
+    {name = 'Soul Punisher', subName = 'Hak', fuerza = 40000000},
+    {name = 'Destruction', subName = 'Hak', fuerza = 40000000},
+    {name = 'Energy Volley', subName = 'voleys', fuerza = 4000},
+}
+
+local functionsEnabled = false
+local lastKbTime = 0
+
+-- Create the GUI
+local function createGUI()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "FunctionsToggleGUI"
+    gui.ResetOnSpawn = false
+    gui.Parent = playerGui
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 200, 0, 100)
+    frame.Position = UDim2.new(0.5, -100, 0.1, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 10)
+    uiCorner.Parent = frame
+
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(0.8, 0, 0.6, 0)
+    toggleButton.Position = UDim2.new(0.1, 0, 0.2, 0)
+    toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    toggleButton.BorderSizePixel = 0
+    toggleButton.Font = Enum.Font.GothamSemibold
+    toggleButton.TextSize = 18
+    toggleButton.TextColor3 = Color3.new(1, 1, 1)
+    toggleButton.Text = "Functions: Off"
+    toggleButton.Parent = frame
+
+    local buttonUICorner = Instance.new("UICorner")
+    buttonUICorner.CornerRadius = UDim.new(0, 8)
+    buttonUICorner.Parent = toggleButton
+
+    local uiGradient = Instance.new("UIGradient")
+    uiGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 200, 200))
+    }
+    uiGradient.Rotation = 90
+    uiGradient.Parent = toggleButton
+
+    -- Make the frame draggable
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+
+    toggleButton.MouseButton1Click:Connect(function()
+        functionsEnabled = not functionsEnabled
+        if functionsEnabled then
+            toggleButton.Text = "Functions: On"
+            toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        else
+            toggleButton.Text = "Functions: Off"
+            toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        end
+    end)
+
+    return gui
+end
+
+-- Create the GUI and make it persistent
+local gui = createGUI()
+
+-- Helper functions
+local function valorMinimo()
+    local valueMinimo = folderData.Strength.Value
+    if folderData.Energy.Value < valueMinimo then
+        valueMinimo = folderData.Energy.Value
+    end
+    if folderData.Defense.Value < valueMinimo then
+        valueMinimo = folderData.Defense.Value
+    end
+    if folderData.Speed.Value < valueMinimo then
+        valueMinimo = folderData.Speed.Value
+    end
+    return valueMinimo
+end
+
+local function ki()
+    return player.Character and player.Character:FindFirstChild("Stats") and player.Character.Stats:FindFirstChild("Ki") and player.Character.Stats.Ki.Value or 0
+end
+
+local function kiRequerido()
+    return player.Character and player.Character:FindFirstChild("Stats") and player.Character.Stats:FindFirstChild("Ki") and player.Character.Stats.Ki.MaxValue / 10 or 0
+end
+
+local function detectarAtaque(name, subname, enemigo)
+    local args = {
+        [1] = name,
+        [2] = {
+            ["FaceMouse"] = true,
+            ["MouseHit"] = enemigo
+        },
+        [3] = "Blacknwhite27"
+    }
+    ReplicatedStorage:WaitForChild("Package"):WaitForChild("Events"):WaitForChild(subname):InvokeServer(unpack(args))
+end
+
+local function isRemoteEnergyUnlocked()
+    -- Replace this with the actual condition to check the gamepass
+    return true
+end
+
+local function autoCarga()
+    ReplicatedStorage.Package.Events.cha:InvokeServer("Blacknwhite27")
+end
+
+local function transformToSSJBUI()
+    local status = player:FindFirstChild("Status")
+    if status and status:FindFirstChild("SelectedTransformation") then
+        local transformation = status.SelectedTransformation.Value
+        if transformation ~= "SSJBUI" then
+            ReplicatedStorage.Package.Events.equipskill:InvokeServer("SSJBUI")
+        end
+    end
+end
+
+local function transformIfNoForm()
+    local status = player:FindFirstChild("Status")
+    if status and status:FindFirstChild("SelectedTransformation") then
+        local transformation = status.SelectedTransformation.Value
+        if transformation == "" then
+            transformToSSJBUI()
+        end
+    end
+end
+
+local function block()
+    ReplicatedStorage.Package.Events.block:InvokeServer(true)
+end
+
+-- Function to execute a single attack
+local function executeAttack(attackData, attackType)
+    while true do
+        if functionsEnabled and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            if attackType == "melee" then
+                if valorMinimo() > attackData.requerido and ki() >= kiRequerido() then
+                    ReplicatedStorage.Package.Events.mel:InvokeServer(attackData.name, "Blacknwhite27")
+                end
+            elseif attackType == "energy" then
+                if valorMinimo() > attackData.fuerza and ki() >= kiRequerido() then
+                    detectarAtaque(attackData.name, attackData.subName, player.Character.HumanoidRootPart.CFrame)
+                end
+            end
+        end
+        RunService.Heartbeat:Wait()
+    end
+end
+
+-- Function to start all attack coroutines
+local function startAllAttacks()
+    for _, attack in ipairs(arregloAtaques) do
+        coroutine.wrap(function() executeAttack(attack, "melee") end)()
+    end
+    
+    if isRemoteEnergyUnlocked() then
+        for _, attack in ipairs(ataquesEnergy) do
+            coroutine.wrap(function() executeAttack(attack, "energy") end)()
+        end
+    end
+end
+
+-- Function for the kb attack
+local function executeKbAttack()
+    local args = {
+        [1] = 1,
+        [2] = false,
+        [3] = CFrame.new(900.6189575195312, 33.33027267456055, 815.3561401367188, -0.05797416716814041, -0.2273985594511032, 0.9720745086669922, -6.856835099711134e-10, 0.9737122058868408, 0.22778166830539703, -0.998318076133728, 0.013205451890826225, -0.05645015463232994)
+    }
+    game:GetService("ReplicatedStorage"):WaitForChild("Package"):WaitForChild("Events"):WaitForChild("kb"):FireServer(unpack(args))
+end
+
+-- Continuous P attack function
+local function continuousPAttack()
+    while true do
+        if functionsEnabled and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local args = {
+                [1] = "Blacknwhite27",
+                [2] = 1
+            }
+            game:GetService("ReplicatedStorage"):WaitForChild("Package"):WaitForChild("Events"):WaitForChild("p"):FireServer(unpack(args))
+        end
+        RunService.Heartbeat:Wait()
+    end
+end
+
+-- Continuous charging loop
+local function continuousChargingLoop()
+    while true do
+        if functionsEnabled and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            autoCarga()
+        end
+        RunService.Heartbeat:Wait()
+    end
+end
+
+-- Main loop
+local function mainLoop()
+    local initialWait = true
+    while true do
+        if functionsEnabled and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            transformIfNoForm()
+            block()
+            
+            -- KB attack logic
+            if initialWait then
+                wait(6)
+                initialWait = false
+            end
+            
+            local currentTime = tick()
+            if currentTime - lastKbTime >= 0.5 then  -- Reduced cooldown to 0.5 seconds
+                executeKbAttack()
+                lastKbTime = currentTime
+            end
+        else
+            initialWait = true
+        end
+        RunService.Heartbeat:Wait()
+    end
+end
+
+-- Function to handle player respawn
+local function onCharacterAdded(char)
+    -- Wait for the character to be fully loaded
+    char:WaitForChild("Humanoid")
+    char:WaitForChild("HumanoidRootPart")
+    
+    -- Restart all necessary functions
+    coroutine.wrap(mainLoop)()
+    coroutine.wrap(continuousChargingLoop)()
+    coroutine.wrap(continuousPAttack)()  -- Start the continuous P attack
+    startAllAttacks()
+end
+
+-- Connect the respawn handler
+player.CharacterAdded:Connect(onCharacterAdded)
+
+-- Start all the loops and coroutines for the initial character
+if player.Character then
+    onCharacterAdded(player.Character)
+else
+    player.CharacterAdded:Wait()
+end
